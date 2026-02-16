@@ -11,10 +11,15 @@ import (
 type criService struct {
 	runtimeapi.UnimplementedRuntimeServiceServer
 	runtimeapi.UnimplementedImageServiceServer
-	numContainers int
+	numContainers  int
+	numAnnotations int
 }
 
-func makeContainer(i int) *runtimeapi.Container {
+func makeContainer(i, numAnnotations int) *runtimeapi.Container {
+	annotations := make(map[string]string, numAnnotations)
+	for j := 0; j < numAnnotations; j++ {
+		annotations[fmt.Sprintf("io.kubernetes.annotation-%d", j)] = fmt.Sprintf("value-%d-%d", i, j)
+	}
 	return &runtimeapi.Container{
 		Id:           fmt.Sprintf("container-%d", i),
 		PodSandboxId: fmt.Sprintf("sandbox-%d", i),
@@ -32,11 +37,8 @@ func makeContainer(i int) *runtimeapi.Container {
 			"app":       fmt.Sprintf("app-%d", i),
 			"component": "server",
 		},
-		Annotations: map[string]string{
-			"io.kubernetes.container.restartCount": "0",
-			"io.kubernetes.pod.name":               fmt.Sprintf("pod-%d", i),
-		},
-		ImageId: fmt.Sprintf("sha256:fedcba%06d", i),
+		Annotations: annotations,
+		ImageId:     fmt.Sprintf("sha256:fedcba%06d", i),
 	}
 }
 
@@ -52,7 +54,7 @@ func (s *criService) Version(ctx context.Context, req *runtimeapi.VersionRequest
 func (s *criService) ListContainers(ctx context.Context, req *runtimeapi.ListContainersRequest) (*runtimeapi.ListContainersResponse, error) {
 	containers := make([]*runtimeapi.Container, s.numContainers)
 	for i := range containers {
-		containers[i] = makeContainer(i)
+		containers[i] = makeContainer(i, s.numAnnotations)
 	}
 	return &runtimeapi.ListContainersResponse{Containers: containers}, nil
 }
@@ -60,7 +62,7 @@ func (s *criService) ListContainers(ctx context.Context, req *runtimeapi.ListCon
 func (s *criService) StreamContainers(req *runtimeapi.StreamContainersRequest, stream grpc.ServerStreamingServer[runtimeapi.StreamContainersResponse]) error {
 	for i := 0; i < s.numContainers; i++ {
 		if err := stream.Send(&runtimeapi.StreamContainersResponse{
-			Container: makeContainer(i),
+			Container: makeContainer(i, s.numAnnotations),
 		}); err != nil {
 			return err
 		}

@@ -15,6 +15,7 @@ import (
 
 func main() {
 	sock := flag.String("listen", "/tmp/cri-bench.sock", "unix socket path to listen on")
+	annotations := flag.Int("annotations", 10, "number of annotations per container")
 	flag.Parse()
 
 	if err := os.Remove(*sock); err != nil && !os.IsNotExist(err) {
@@ -28,7 +29,7 @@ func main() {
 	defer lis.Close()
 
 	srv := grpc.NewServer()
-	svc := &criService{numContainers: 1000}
+	svc := &criService{numContainers: 1000, numAnnotations: *annotations}
 	runtimeapi.RegisterRuntimeServiceServer(srv, svc)
 	runtimeapi.RegisterImageServiceServer(srv, svc)
 
