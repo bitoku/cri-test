@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"os"
 	"testing"
 	"time"
 
@@ -15,7 +16,8 @@ import (
 
 func startTestServer(tb testing.TB, numContainers, numAnnotations int) (string, func()) {
 	tb.Helper()
-	sock := fmt.Sprintf("%s/cri-bench-%d.sock", tb.TempDir(), time.Now().UnixNano())
+	sock := fmt.Sprintf("/tmp/cri-%d.sock", time.Now().UnixNano())
+	tb.Cleanup(func() { os.Remove(sock) })
 	lis, err := net.Listen("unix", sock)
 	if err != nil {
 		tb.Fatal(err)
