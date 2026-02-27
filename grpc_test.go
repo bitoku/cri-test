@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	internalapi "k8s.io/cri-api/pkg/apis"
 )
@@ -12,10 +11,10 @@ import (
 // Separate benchmarks for list-only and stream-only so CPU/mem profiles
 // are not mixed together.
 
-func benchmarkListOnly(b *testing.B, numContainers, numAnnotations int) {
+func benchmarkListOnly(b *testing.B, numContainers, numAnnotations, numPerChunk int) {
 	b.Helper()
 
-	sock, stop := startTestServer(b, numContainers, numAnnotations)
+	sock, stop := startTestServer(b, numContainers, numAnnotations, numPerChunk)
 	defer stop()
 
 	client := newCRIClient(b, sock, false)
@@ -34,10 +33,10 @@ func benchmarkListOnly(b *testing.B, numContainers, numAnnotations int) {
 	}
 }
 
-func benchmarkStreamOnly(b *testing.B, numContainers, numAnnotations int) {
+func benchmarkStreamOnly(b *testing.B, numContainers, numAnnotations, numPerChunk int) {
 	b.Helper()
 
-	sock, stop := startTestServer(b, numContainers, numAnnotations)
+	sock, stop := startTestServer(b, numContainers, numAnnotations, numPerChunk)
 	defer stop()
 
 	client := newCRIClient(b, sock, true)
@@ -59,9 +58,14 @@ func benchmarkStreamOnly(b *testing.B, numContainers, numAnnotations int) {
 func BenchmarkGRPCList(b *testing.B) {
 	for _, containers := range containerCounts {
 		for _, annotations := range annotationCounts {
-			b.Run(fmt.Sprintf("containers=%d/annotations=%d", containers, annotations), func(b *testing.B) {
-				benchmarkListOnly(b, containers, annotations)
-			})
+			for _, perChunk := range chunkCounts {
+				if perChunk > containers {
+					continue
+				}
+				b.Run(fmt.Sprintf("containers=%d/annotations=%d/perChunk=%d", containers, annotations, perChunk), func(b *testing.B) {
+					benchmarkListOnly(b, containers, annotations, perChunk)
+				})
+			}
 		}
 	}
 }
@@ -69,83 +73,14 @@ func BenchmarkGRPCList(b *testing.B) {
 func BenchmarkGRPCStream(b *testing.B) {
 	for _, containers := range containerCounts {
 		for _, annotations := range annotationCounts {
-			b.Run(fmt.Sprintf("containers=%d/annotations=%d", containers, annotations), func(b *testing.B) {
-				benchmarkStreamOnly(b, containers, annotations)
-			})
-		}
-	}
-}
-
-// BenchmarkGRPCLatencyBreakdown measures client-side and server-side latency
-// separately by timing the server handler directly.
-func BenchmarkGRPCLatencyBreakdown(b *testing.B) {
-	type mode struct {
-		name      string
-		streaming bool
-	}
-	modes := []mode{{"list", false}, {"stream", true}}
-
-	for _, m := range modes {
-		for _, containers := range []int{256, 1024} {
-			for _, annotations := range []int{8, 32} {
-				name := fmt.Sprintf("mode=%s/containers=%d/annotations=%d", m.name, containers, annotations)
-				b.Run(name, func(b *testing.B) {
-					sock, stop := startTestServer(b, containers, annotations)
-					defer stop()
-
-					client := newCRIClient(b, sock, m.streaming)
-					defer client.Close()
-
-					_, _ = client.ListContainers(context.Background(), nil)
-
-					var total time.Duration
-					b.ReportAllocs()
-					b.ResetTimer()
-					for range b.N {
-						start := time.Now()
-						_, err := client.ListContainers(context.Background(), nil)
-						total += time.Since(start)
-						if err != nil {
-							b.Fatal(err)
-						}
-					}
-					b.ReportMetric(float64(total.Microseconds())/float64(b.N), "us/req")
+			for _, perChunk := range chunkCounts {
+				if perChunk > containers {
+					continue
+				}
+				b.Run(fmt.Sprintf("containers=%d/annotations=%d/perChunk=%d", containers, annotations, perChunk), func(b *testing.B) {
+					benchmarkStreamOnly(b, containers, annotations, perChunk)
 				})
 			}
-		}
-	}
-}
-
-// BenchmarkGRPCServerSide isolates the server-side work by directly calling
-// the service handler, bypassing gRPC transport entirely.
-func BenchmarkGRPCServerSide(b *testing.B) {
-	for _, containers := range []int{256, 1024} {
-		for _, annotations := range []int{8, 32} {
-			name := fmt.Sprintf("containers=%d/annotations=%d", containers, annotations)
-
-			b.Run(name+"/unary", func(b *testing.B) {
-				svc := &criService{numContainers: containers, numAnnotations: annotations}
-				b.ReportAllocs()
-				b.ResetTimer()
-				for range b.N {
-					_, err := svc.ListContainers(context.Background(), nil)
-					if err != nil {
-						b.Fatal(err)
-					}
-				}
-			})
-
-			b.Run(name+"/stream-build", func(b *testing.B) {
-				// Simulates streaming server work: build each container individually.
-				b.ReportAllocs()
-				b.ResetTimer()
-				for range b.N {
-					for i := range containers {
-						c := makeContainer(i, annotations)
-						_ = c
-					}
-				}
-			})
 		}
 	}
 }
@@ -166,7 +101,7 @@ func BenchmarkGRPCAllocs(b *testing.B) {
 				label = "stream"
 			}
 			b.Run(name+"/"+label, func(b *testing.B) {
-				sock, stop := startTestServer(b, p.containers, p.annotations)
+				sock, stop := startTestServer(b, p.containers, p.annotations, p.containers)
 				defer stop()
 
 				var rs internalapi.RuntimeService

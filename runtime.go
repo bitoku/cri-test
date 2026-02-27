@@ -13,33 +13,38 @@ type criService struct {
 	runtimeapi.UnimplementedImageServiceServer
 	numContainers  int
 	numAnnotations int
+	numPerChunk    int
 }
 
-func makeContainer(i, numAnnotations int) *runtimeapi.Container {
-	annotations := make(map[string]string, numAnnotations)
-	for j := 0; j < numAnnotations; j++ {
-		annotations[fmt.Sprintf("io.kubernetes.annotation-%d", j)] = fmt.Sprintf("value-%d-%d", i, j)
+func makeContainers(num, numAnnotations int) []*runtimeapi.Container {
+	containers := make([]*runtimeapi.Container, num)
+	for i := range containers {
+		annotations := make(map[string]string, numAnnotations)
+		for j := 0; j < numAnnotations; j++ {
+			annotations[fmt.Sprintf("io.kubernetes.annotation-%d", j)] = fmt.Sprintf("value-%d-%d", i, j)
+		}
+		containers[i] = &runtimeapi.Container{
+			Id:           fmt.Sprintf("container-%d", i),
+			PodSandboxId: fmt.Sprintf("sandbox-%d", i),
+			Metadata: &runtimeapi.ContainerMetadata{
+				Name:    fmt.Sprintf("name-%d", i),
+				Attempt: uint32(i),
+			},
+			Image: &runtimeapi.ImageSpec{
+				Image: fmt.Sprintf("registry.example.com/image-%d:latest", i),
+			},
+			ImageRef:  fmt.Sprintf("sha256:abcdef%06d", i),
+			State:     runtimeapi.ContainerState_CONTAINER_RUNNING,
+			CreatedAt: int64(1700000000 + i),
+			Labels: map[string]string{
+				"app":       fmt.Sprintf("app-%d", i),
+				"component": "server",
+			},
+			Annotations: annotations,
+			ImageId:     fmt.Sprintf("sha256:fedcba%06d", i),
+		}
 	}
-	return &runtimeapi.Container{
-		Id:           fmt.Sprintf("container-%d", i),
-		PodSandboxId: fmt.Sprintf("sandbox-%d", i),
-		Metadata: &runtimeapi.ContainerMetadata{
-			Name:    fmt.Sprintf("name-%d", i),
-			Attempt: uint32(i),
-		},
-		Image: &runtimeapi.ImageSpec{
-			Image: fmt.Sprintf("registry.example.com/image-%d:latest", i),
-		},
-		ImageRef:  fmt.Sprintf("sha256:abcdef%06d", i),
-		State:     runtimeapi.ContainerState_CONTAINER_RUNNING,
-		CreatedAt: int64(1700000000 + i),
-		Labels: map[string]string{
-			"app":       fmt.Sprintf("app-%d", i),
-			"component": "server",
-		},
-		Annotations: annotations,
-		ImageId:     fmt.Sprintf("sha256:fedcba%06d", i),
-	}
+	return containers
 }
 
 func (s *criService) Version(ctx context.Context, req *runtimeapi.VersionRequest) (*runtimeapi.VersionResponse, error) {
@@ -52,17 +57,18 @@ func (s *criService) Version(ctx context.Context, req *runtimeapi.VersionRequest
 }
 
 func (s *criService) ListContainers(ctx context.Context, req *runtimeapi.ListContainersRequest) (*runtimeapi.ListContainersResponse, error) {
-	containers := make([]*runtimeapi.Container, s.numContainers)
-	for i := range containers {
-		containers[i] = makeContainer(i, s.numAnnotations)
-	}
-	return &runtimeapi.ListContainersResponse{Containers: containers}, nil
+	return &runtimeapi.ListContainersResponse{Containers: makeContainers(s.numContainers, s.numAnnotations)}, nil
 }
 
 func (s *criService) StreamContainers(req *runtimeapi.StreamContainersRequest, stream grpc.ServerStreamingServer[runtimeapi.StreamContainersResponse]) error {
-	for i := 0; i < s.numContainers; i++ {
+	containers := makeContainers(s.numContainers, s.numAnnotations)
+	for i := 0; i < len(containers); i += s.numPerChunk {
+		end := i + s.numPerChunk
+		if end > len(containers) {
+			end = len(containers)
+		}
 		if err := stream.Send(&runtimeapi.StreamContainersResponse{
-			Container: makeContainer(i, s.numAnnotations),
+			Containers: containers[i:end],
 		}); err != nil {
 			return err
 		}

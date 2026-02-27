@@ -52,10 +52,10 @@ require (
 )
 
 replace (
-	k8s.io/api => github.com/bitoku/kubernetes/staging/src/k8s.io/api v0.0.0-20260214015612-937d1daee738
-	k8s.io/apimachinery => github.com/bitoku/kubernetes/staging/src/k8s.io/apimachinery v0.0.0-20260214015612-937d1daee738
-	k8s.io/client-go => github.com/bitoku/kubernetes/staging/src/k8s.io/client-go v0.0.0-20260214015612-937d1daee738
-	k8s.io/component-base => github.com/bitoku/kubernetes/staging/src/k8s.io/component-base v0.0.0-20260214015612-937d1daee738
-	k8s.io/cri-api => github.com/bitoku/kubernetes/staging/src/k8s.io/cri-api v0.0.0-20260214015612-937d1daee738
-	k8s.io/cri-client => github.com/bitoku/kubernetes/staging/src/k8s.io/cri-client v0.0.0-20260214015612-937d1daee738
+	k8s.io/api => github.com/bitoku/kubernetes/staging/src/k8s.io/api v0.0.0-20260227172243-5e9eda91e3af
+	k8s.io/apimachinery => github.com/bitoku/kubernetes/staging/src/k8s.io/apimachinery v0.0.0-20260227172243-5e9eda91e3af
+	k8s.io/client-go => github.com/bitoku/kubernetes/staging/src/k8s.io/client-go v0.0.0-20260227172243-5e9eda91e3af
+	k8s.io/component-base => github.com/bitoku/kubernetes/staging/src/k8s.io/component-base v0.0.0-20260227172243-5e9eda91e3af
+	k8s.io/cri-api => github.com/bitoku/kubernetes/staging/src/k8s.io/cri-api v0.0.0-20260227172243-5e9eda91e3af
+	k8s.io/cri-client => github.com/bitoku/kubernetes/staging/src/k8s.io/cri-client v0.0.0-20260227172243-5e9eda91e3af
 )
