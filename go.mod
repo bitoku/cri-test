@@ -4,7 +4,6 @@ go 1.26.0
 
 require (
 	google.golang.org/grpc v1.78.0
-	google.golang.org/protobuf v1.36.11
 	k8s.io/cri-api v0.35.1
 	k8s.io/cri-client v0.0.0-00010101000000-000000000000
 )
@@ -44,18 +43,19 @@ require (
 	golang.org/x/time v0.14.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260128011058-8636f8732409 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260128011058-8636f8732409 // indirect
+	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af // indirect
 	k8s.io/apimachinery v0.0.0 // indirect
 	k8s.io/client-go v0.0.0 // indirect
 	k8s.io/component-base v0.0.0 // indirect
-	k8s.io/klog/v2 v2.130.1 // indirect
-	k8s.io/utils v0.0.0-20260108192941-914a6e750570 // indirect
+	k8s.io/klog/v2 v2.140.0 // indirect
+	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2 // indirect
 )
 
 replace (
-	k8s.io/api => github.com/bitoku/kubernetes/staging/src/k8s.io/api v0.0.0-20260227172243-5e9eda91e3af
-	k8s.io/apimachinery => github.com/bitoku/kubernetes/staging/src/k8s.io/apimachinery v0.0.0-20260227172243-5e9eda91e3af
-	k8s.io/client-go => github.com/bitoku/kubernetes/staging/src/k8s.io/client-go v0.0.0-20260227172243-5e9eda91e3af
-	k8s.io/component-base => github.com/bitoku/kubernetes/staging/src/k8s.io/component-base v0.0.0-20260227172243-5e9eda91e3af
-	k8s.io/cri-api => github.com/bitoku/kubernetes/staging/src/k8s.io/cri-api v0.0.0-20260227172243-5e9eda91e3af
-	k8s.io/cri-client => github.com/bitoku/kubernetes/staging/src/k8s.io/cri-client v0.0.0-20260227172243-5e9eda91e3af
+	k8s.io/api => github.com/bitoku/kubernetes/staging/src/k8s.io/api v0.0.0-20260311153604-3ba7af3bb754
+	k8s.io/apimachinery => github.com/bitoku/kubernetes/staging/src/k8s.io/apimachinery v0.0.0-20260311153604-3ba7af3bb754
+	k8s.io/client-go => github.com/bitoku/kubernetes/staging/src/k8s.io/client-go v0.0.0-20260311153604-3ba7af3bb754
+	k8s.io/component-base => github.com/bitoku/kubernetes/staging/src/k8s.io/component-base v0.0.0-20260311153604-3ba7af3bb754
+	k8s.io/cri-api => github.com/bitoku/kubernetes/staging/src/k8s.io/cri-api v0.0.0-20260311153604-3ba7af3bb754
+	k8s.io/cri-client => github.com/bitoku/kubernetes/staging/src/k8s.io/cri-client v0.0.0-20260311153604-3ba7af3bb754
 )

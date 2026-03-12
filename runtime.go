@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/proto"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -14,6 +15,7 @@ type criService struct {
 	numContainers  int
 	numAnnotations int
 	numPerChunk    int
+	checkSize      bool
 }
 
 func makeContainers(num, numAnnotations int) []*runtimeapi.Container {
@@ -57,7 +59,11 @@ func (s *criService) Version(ctx context.Context, req *runtimeapi.VersionRequest
 }
 
 func (s *criService) ListContainers(ctx context.Context, req *runtimeapi.ListContainersRequest) (*runtimeapi.ListContainersResponse, error) {
-	return &runtimeapi.ListContainersResponse{Containers: makeContainers(s.numContainers, s.numAnnotations)}, nil
+	resp := &runtimeapi.ListContainersResponse{Containers: makeContainers(s.numContainers, s.numAnnotations)}
+	if s.checkSize {
+		proto.Size(resp)
+	}
+	return resp, nil
 }
 
 func (s *criService) StreamContainers(req *runtimeapi.StreamContainersRequest, stream grpc.ServerStreamingServer[runtimeapi.StreamContainersResponse]) error {
@@ -67,9 +73,13 @@ func (s *criService) StreamContainers(req *runtimeapi.StreamContainersRequest, s
 		if end > len(containers) {
 			end = len(containers)
 		}
-		if err := stream.Send(&runtimeapi.StreamContainersResponse{
+		resp := &runtimeapi.StreamContainersResponse{
 			Containers: containers[i:end],
-		}); err != nil {
+		}
+		if s.checkSize {
+			proto.Size(resp)
+		}
+		if err := stream.Send(resp); err != nil {
 			return err
 		}
 	}

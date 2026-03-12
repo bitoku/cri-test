@@ -58,14 +58,9 @@ func benchmarkStreamOnly(b *testing.B, numContainers, numAnnotations, numPerChun
 func BenchmarkGRPCList(b *testing.B) {
 	for _, containers := range containerCounts {
 		for _, annotations := range annotationCounts {
-			for _, perChunk := range chunkCounts {
-				if perChunk > containers {
-					continue
-				}
-				b.Run(fmt.Sprintf("containers=%d/annotations=%d/perChunk=%d", containers, annotations, perChunk), func(b *testing.B) {
-					benchmarkListOnly(b, containers, annotations, perChunk)
-				})
-			}
+			b.Run(fmt.Sprintf("containers=%d/annotations=%d", containers, annotations), func(b *testing.B) {
+				benchmarkListOnly(b, containers, annotations, containers)
+			})
 		}
 	}
 }
@@ -73,15 +68,40 @@ func BenchmarkGRPCList(b *testing.B) {
 func BenchmarkGRPCStream(b *testing.B) {
 	for _, containers := range containerCounts {
 		for _, annotations := range annotationCounts {
-			for _, perChunk := range chunkCounts {
-				if perChunk > containers {
-					continue
-				}
-				b.Run(fmt.Sprintf("containers=%d/annotations=%d/perChunk=%d", containers, annotations, perChunk), func(b *testing.B) {
-					benchmarkStreamOnly(b, containers, annotations, perChunk)
-				})
-			}
+			b.Run(fmt.Sprintf("containers=%d/annotations=%d", containers, annotations), func(b *testing.B) {
+				benchmarkStreamOnly(b, containers, annotations, containers)
+			})
 		}
+	}
+}
+
+func BenchmarkStreamCheckSize(b *testing.B) {
+	for _, checkSize := range []bool{false, true} {
+		label := "without-proto.Size"
+		if checkSize {
+			label = "with-proto.Size"
+		}
+		b.Run(label, func(b *testing.B) {
+			cs := checkSize
+			sock, stop := startTestServer(b, 1024, 32, 1024, func(s *criService) {
+				s.checkSize = cs
+			})
+			defer stop()
+
+			client := newCRIClient(b, sock, true)
+			defer client.Close()
+
+			_, _ = client.ListContainers(context.Background(), nil)
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for range b.N {
+				_, err := client.ListContainers(context.Background(), nil)
+				if err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
 	}
 }
 

@@ -14,7 +14,7 @@ import (
 	cri "k8s.io/cri-client/pkg"
 )
 
-func startTestServer(tb testing.TB, numContainers, numAnnotations, numPerChunk int) (string, func()) {
+func startTestServer(tb testing.TB, numContainers, numAnnotations, numPerChunk int, opts ...func(*criService)) (string, func()) {
 	tb.Helper()
 	sock := fmt.Sprintf("/tmp/cri-%d.sock", time.Now().UnixNano())
 	tb.Cleanup(func() { os.Remove(sock) })
@@ -24,6 +24,9 @@ func startTestServer(tb testing.TB, numContainers, numAnnotations, numPerChunk i
 	}
 	srv := grpc.NewServer()
 	svc := &criService{numContainers: numContainers, numAnnotations: numAnnotations, numPerChunk: numPerChunk}
+	for _, o := range opts {
+		o(svc)
+	}
 	runtimev1.RegisterRuntimeServiceServer(srv, svc)
 	runtimev1.RegisterImageServiceServer(srv, svc)
 	go srv.Serve(lis)
@@ -43,14 +46,13 @@ func newCRIClient(tb testing.TB, sock string, useStreaming bool) internalapi.Run
 var (
 	containerCounts  = []int{4, 8, 16, 32, 64, 128, 256, 512, 1024}
 	annotationCounts = []int{1, 2, 4, 8, 16, 32}
-	chunkCounts      = []int{1, 4, 16, 64, 256}
 	tries            = 100
 )
 
-func benchRequests(b *testing.B, useStreaming bool, numContainers, numAnnotations, numPerChunk, tries int) time.Duration {
+func benchRequests(b *testing.B, useStreaming bool, numContainers, numAnnotations, tries int) time.Duration {
 	b.Helper()
 
-	sock, stop := startTestServer(b, numContainers, numAnnotations, numPerChunk)
+	sock, stop := startTestServer(b, numContainers, numAnnotations, numContainers)
 	defer stop()
 
 	client := newCRIClient(b, sock, useStreaming)
@@ -75,26 +77,21 @@ func benchRequests(b *testing.B, useStreaming bool, numContainers, numAnnotation
 func BenchmarkCRIListVsStream(b *testing.B) {
 	for _, containers := range containerCounts {
 		for _, annotations := range annotationCounts {
-			for _, perChunk := range chunkCounts {
-				if perChunk > containers {
-					continue
+			b.Run(fmt.Sprintf("containers=%d/annotations=%d", containers, annotations), func(b *testing.B) {
+				var listTotal, streamTotal time.Duration
+
+				for n := 0; n < b.N; n++ {
+					listTotal += benchRequests(b, false, containers, annotations, tries)
+					streamTotal += benchRequests(b, true, containers, annotations, tries)
 				}
-				b.Run(fmt.Sprintf("containers=%d/annotations=%d/perChunk=%d", containers, annotations, perChunk), func(b *testing.B) {
-					var listTotal, streamTotal time.Duration
 
-					for n := 0; n < b.N; n++ {
-						listTotal += benchRequests(b, false, containers, annotations, perChunk, tries)
-						streamTotal += benchRequests(b, true, containers, annotations, perChunk, tries)
-					}
+				totalRequests := float64(b.N) * float64(tries)
+				listMsPerReq := float64(listTotal.Milliseconds()) / totalRequests
+				streamMsPerReq := float64(streamTotal.Milliseconds()) / totalRequests
 
-					totalRequests := float64(b.N) * float64(tries)
-					listMsPerReq := float64(listTotal.Milliseconds()) / totalRequests
-					streamMsPerReq := float64(streamTotal.Milliseconds()) / totalRequests
-
-					b.ReportMetric(listMsPerReq, "list-ms/req")
-					b.ReportMetric(streamMsPerReq, "stream-ms/req")
-				})
-			}
+				b.ReportMetric(listMsPerReq, "list-ms/req")
+				b.ReportMetric(streamMsPerReq, "stream-ms/req")
+			})
 		}
 	}
 }
